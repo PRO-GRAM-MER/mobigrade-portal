@@ -336,7 +336,7 @@ function TableView({
               label: draft.status,
               cls: "badge--neutral",
             };
-            const condCls = CONDITION_CLS[draft.condition] ?? "badge--neutral";
+            const condCls = (draft.condition ? CONDITION_CLS[draft.condition] : null) ?? "badge--neutral";
 
             return (
               <>
@@ -439,7 +439,7 @@ function GridView({ drafts }: { drafts: BatchDetailDraft[] }) {
           label: draft.status,
           cls: "badge--neutral",
         };
-        const condCls = CONDITION_CLS[draft.condition] ?? "badge--neutral";
+        const condCls = (draft.condition ? CONDITION_CLS[draft.condition] : undefined) ?? "badge--neutral";
 
         return (
           <div
@@ -456,7 +456,7 @@ function GridView({ drafts }: { drafts: BatchDetailDraft[] }) {
             {draft.imageUrls.length > 0 ? (
               <img
                 src={draft.imageUrls[0]}
-                alt={draft.partName}
+                alt={draft.partName ?? undefined}
                 style={{
                   width: "100%",
                   height: "120px",

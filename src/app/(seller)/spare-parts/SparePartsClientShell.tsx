@@ -346,7 +346,7 @@ function ManualEntriesTab({
           <tbody>
             {drafts.map((d) => {
               const st = DRAFT_STATUS[d.status] ?? { label: d.status, cls: "badge--neutral" };
-              const condCls = CONDITION_CLS[d.condition] ?? "badge--neutral";
+              const condCls = (d.condition ? CONDITION_CLS[d.condition] : undefined) ?? "badge--neutral";
               return (
                 <tr key={d.id}>
                   <td style={{ color: "var(--color-primary)", fontWeight: 500 }}>{d.brand}</td>

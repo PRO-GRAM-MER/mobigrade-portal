@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -254,7 +254,7 @@ function DesktopLogin({ onSubmit, loading }: LoginProps) {
 /* ═══════════════════════════════════════════════
    ROOT
 ═══════════════════════════════════════════════ */
-export default function LoginPage() {
+function LoginInner() {
   const router      = useRouter();
   const params      = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/dashboard";
@@ -298,5 +298,13 @@ export default function LoginPage() {
         <DesktopLogin {...props} />
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
   );
 }
