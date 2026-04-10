@@ -2,12 +2,15 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import {
   rejectDraftSchema,
   requestChangesSchema,
   enrichProductSchema,
   type EnrichProductInput,
 } from "@/lib/validations/admin";
+
+const log = logger("admin-actions");
 import type {
   DraftStatus,
   SellerProductStatus,
@@ -138,90 +141,6 @@ export async function rejectKycAction(formData: FormData): Promise<void> {
   ]);
 }
 
-// ─── listPendingDraftsAction ──────────────────────────────────────────────────
-// Paginated review queue — grouped by batch, then manual entries.
-
-export async function listPendingDraftsAction(page = 1, batchId?: string) {
-  const guard = await requireAdmin();
-  if ("error" in guard) return null;
-
-  const PAGE_SIZE = 30;
-  const skip = (page - 1) * PAGE_SIZE;
-
-  const where = {
-    status: "PENDING_REVIEW" as DraftStatus,
-    ...(batchId ? { batchId } : {}),
-  };
-
-  const [drafts, total] = await Promise.all([
-    prisma.catalogProductDraft.findMany({
-      where,
-      orderBy: { createdAt: "asc" }, // oldest first — FIFO review
-      skip,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        brand: true,
-        modelName: true,
-        partName: true,
-        partNumber: true,
-        condition: true,
-        price: true,
-        quantity: true,
-        description: true,
-        imageUrls: true,
-        batchId: true,
-        rowNumber: true,
-        createdAt: true,
-        category: { select: { name: true } },
-        sellerProfile: {
-          select: {
-            id: true,
-            businessName: true,
-            user: { select: { fullName: true, email: true } },
-          },
-        },
-        batch: {
-          select: { filename: true, totalRows: true, validRows: true },
-        },
-      },
-    }),
-    prisma.catalogProductDraft.count({ where }),
-  ]);
-
-  return { drafts, total, page, pageSize: PAGE_SIZE };
-}
-
-// ─── listPendingBatchesAction ─────────────────────────────────────────────────
-// Batches with at least one PENDING_REVIEW draft — for batch-level review workflow.
-
-export async function listPendingBatchesAction() {
-  const guard = await requireAdmin();
-  if ("error" in guard) return null;
-
-  return prisma.catalogUploadBatch.findMany({
-    where: {
-      drafts: { some: { status: "PENDING_REVIEW" } },
-    },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      filename: true,
-      totalRows: true,
-      validRows: true,
-      errorRows: true,
-      createdAt: true,
-      sellerProfile: {
-        select: {
-          businessName: true,
-          user: { select: { fullName: true, email: true } },
-        },
-      },
-      _count: { select: { drafts: { where: { status: "PENDING_REVIEW" } } } },
-    },
-  });
-}
-
 // ─── approveDraftAction ───────────────────────────────────────────────────────
 // Creates SellerProduct from approved draft in an atomic transaction.
 // Also auto-creates a stub LiveProduct (DRAFT) ready for enrichment.
@@ -235,7 +154,20 @@ export async function approveDraftAction(
 
   const draft = await prisma.catalogProductDraft.findUnique({
     where: { id: draftId },
-    include: {
+    select: {
+      id: true,
+      status: true,
+      brand: true,
+      modelName: true,
+      partName: true,
+      partNumber: true,
+      condition: true,
+      price: true,
+      quantity: true,
+      description: true,
+      imageUrls: true,
+      sellerProfileId: true,
+      categoryId: true,
       sellerProfile: { select: { id: true, userId: true, businessName: true } },
       category: { select: { id: true } },
     },
@@ -310,6 +242,7 @@ export async function approveDraftAction(
     return sellerProduct;
   });
 
+  log.info("approveDraft: succeeded", { draftId, sellerProductId: result.id, adminId });
   return { success: true, data: { sellerProductId: result.id } };
 }
 
@@ -369,6 +302,7 @@ export async function rejectDraftAction(
     }),
   ]);
 
+  log.info("rejectDraft: succeeded", { draftId, adminId });
   return { success: true, data: undefined };
 }
 
@@ -429,63 +363,6 @@ export async function requestChangesAction(
   ]);
 
   return { success: true, data: undefined };
-}
-
-// ─── listSellerProductsAction ─────────────────────────────────────────────────
-// Admin view of approved products by enrichment status.
-
-export async function listSellerProductsAction(
-  status?: SellerProductStatus,
-  page = 1
-) {
-  const guard = await requireAdmin();
-  if ("error" in guard) return null;
-
-  const PAGE_SIZE = 30;
-  const skip = (page - 1) * PAGE_SIZE;
-
-  const where = status ? { status } : {};
-
-  const [products, total] = await Promise.all([
-    prisma.sellerProduct.findMany({
-      where,
-      orderBy: { approvedAt: "desc" },
-      skip,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        brand: true,
-        modelName: true,
-        partName: true,
-        condition: true,
-        sellerPrice: true,
-        quantity: true,
-        status: true,
-        approvedAt: true,
-        imageUrls: true,
-        category: { select: { name: true } },
-        sellerProfile: {
-          select: {
-            businessName: true,
-            user: { select: { fullName: true } },
-          },
-        },
-        liveProduct: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            listingPrice: true,
-            status: true,
-            publishedAt: true,
-          },
-        },
-      },
-    }),
-    prisma.sellerProduct.count({ where }),
-  ]);
-
-  return { products, total, page, pageSize: PAGE_SIZE };
 }
 
 // ─── enrichProductAction ──────────────────────────────────────────────────────
@@ -562,6 +439,7 @@ export async function enrichProductAction(
     }),
   ]);
 
+  log.info("enrichProduct: succeeded", { sellerProductId, liveProductId: liveProduct.id, adminId });
   return { success: true, data: { liveProductId: liveProduct.id } };
 }
 
@@ -577,7 +455,19 @@ export async function publishProductAction(
 
   const sellerProduct = await prisma.sellerProduct.findUnique({
     where: { id: sellerProductId },
-    include: { liveProduct: true },
+    select: {
+      status: true,
+      liveProduct: {
+        select: {
+          id: true,
+          status: true,
+          title: true,
+          description: true,
+          imageUrls: true,
+          specs: true,
+        },
+      },
+    },
   });
 
   if (!sellerProduct) return { success: false, error: "Seller product not found" };
@@ -609,6 +499,7 @@ export async function publishProductAction(
     }),
   ]);
 
+  log.info("publishProduct: succeeded", { sellerProductId, liveProductId: live.id });
   return { success: true, data: undefined };
 }
 
@@ -647,5 +538,6 @@ export async function unpublishProductAction(
     }),
   ]);
 
+  log.info("unpublishProduct: succeeded", { sellerProductId, targetStatus });
   return { success: true, data: undefined };
 }

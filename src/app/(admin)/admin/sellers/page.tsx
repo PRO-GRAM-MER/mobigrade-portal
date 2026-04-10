@@ -8,6 +8,7 @@ import {
 import PageHeader from "@/components/shared/PageHeader";
 import { SellersFilter } from "./SellersFilter";
 import classes from "./sellers.module.css";
+import s from "../admin.module.css";
 
 export const metadata: Metadata = { title: "Sellers — MobiGrade Portal" };
 
@@ -54,32 +55,51 @@ function SkeletonRows() {
   ));
 }
 
+const PAGE_SIZE = 25;
+
 /* ── Table (server) ─────────────────────────────────────────────────────── */
-async function SellersTable({ search, status }: { search: string; status: string }) {
-  const sellers = await prisma.user.findMany({
-    where: {
-      role: "SELLER",
-      ...(status ? { verificationStatus: status as VerificationStatus } : {}),
-      ...(search
-        ? {
-            OR: [
-              { email:  { contains: search, mode: "insensitive" } },
-              { mobile: { contains: search } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      mobile: true,
-      verificationStatus: true,
-      createdAt: true,
-    },
-  });
+async function SellersTable({ search, status, page }: { search: string; status: string; page: number }) {
+  const where = {
+    role: "SELLER" as const,
+    ...(status ? { verificationStatus: status as VerificationStatus } : {}),
+    ...(search
+      ? {
+          OR: [
+            { email:  { contains: search, mode: "insensitive" as const } },
+            { mobile: { contains: search } },
+          ],
+        }
+      : {}),
+  };
+
+  const [sellers, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        mobile: true,
+        verificationStatus: true,
+        createdAt: true,
+      },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  function buildUrl(p: number) {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (status) params.set("status", status);
+    if (p > 1)  params.set("page", String(p));
+    const str = params.toString();
+    return `/admin/sellers${str ? `?${str}` : ""}`;
+  }
 
   if (sellers.length === 0) {
     return (
@@ -93,39 +113,57 @@ async function SellersTable({ search, status }: { search: string; status: string
   }
 
   return (
-    <div className={classes.tableCard}>
-      <table className={classes.table}>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>KYC Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sellers.map(seller => (
-            <tr key={seller.id}>
-              <td>
-                <p className={classes.tdName}>{seller.fullName}</p>
-                <p className={classes.tdSub}>
-                  Joined {new Date(seller.createdAt).toLocaleDateString("en-IN")}
-                </p>
-              </td>
-              <td>{seller.email}</td>
-              <td>{seller.mobile}</td>
-              <td><StatusPill status={seller.verificationStatus} /></td>
-              <td>
-                <Link href={`/admin/sellers/${seller.id}`} className={classes.viewBtn}>
-                  View
-                </Link>
-              </td>
+    <>
+      <div className={classes.tableCard}>
+        <table className={classes.table}>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>KYC Status</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {sellers.map(seller => (
+              <tr key={seller.id}>
+                <td>
+                  <p className={classes.tdName}>{seller.fullName}</p>
+                  <p className={classes.tdSub}>
+                    Joined {new Date(seller.createdAt).toLocaleDateString("en-IN")}
+                  </p>
+                </td>
+                <td>{seller.email}</td>
+                <td>{seller.mobile}</td>
+                <td><StatusPill status={seller.verificationStatus} /></td>
+                <td>
+                  <Link href={`/admin/sellers/${seller.id}`} className={classes.viewBtn}>
+                    View
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className={s.pagination}>
+          <span className={s.paginationInfo}>
+            Page {page} of {totalPages} · {total} total
+          </span>
+          <div className={s.paginationControls}>
+            {page > 1 && (
+              <Link href={buildUrl(page - 1)} className={s.pageBtn}>← Prev</Link>
+            )}
+            {page < totalPages && (
+              <Link href={buildUrl(page + 1)} className={s.pageBtn}>Next →</Link>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -133,9 +171,10 @@ async function SellersTable({ search, status }: { search: string; status: string
 export default async function SellersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
 }) {
-  const { search = "", status = "" } = await searchParams;
+  const { search = "", status = "", page: pageParam = "1" } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam, 10));
 
   return (
     <div className={classes.page}>
@@ -156,7 +195,7 @@ export default async function SellersPage({
           </div>
         }
       >
-        <SellersTable search={search} status={status} />
+        <SellersTable search={search} status={status} page={page} />
       </Suspense>
     </div>
   );

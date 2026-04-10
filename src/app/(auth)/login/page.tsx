@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Eye, EyeOff, ArrowRight, Leaf, Recycle } from "lucide-react";
 import { toast } from "sonner";
 import s from "./login.module.css";

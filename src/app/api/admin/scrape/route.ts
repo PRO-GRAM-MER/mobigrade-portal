@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { parsePage } from "@/lib/scrape/parsers";
+import { apiOk, apiErr } from "@/lib/api";
 
 const HEADERS = {
   "User-Agent":
@@ -15,14 +16,14 @@ export async function POST(req: NextRequest) {
   // Admin-only
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(apiErr("Unauthorized"), { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
   const url  = typeof body.url === "string" ? body.url.trim() : "";
 
   if (!url) {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    return NextResponse.json(apiErr("URL is required"), { status: 400 });
   }
 
   // Validate URL
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("bad protocol");
   } catch {
-    return NextResponse.json({ error: "Invalid URL — must start with http/https" }, { status: 400 });
+    return NextResponse.json(apiErr("Invalid URL — must start with http/https"), { status: 400 });
   }
 
   try {
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: `Site returned HTTP ${res.status}. Try a different URL.` },
+        apiErr(`Site returned HTTP ${res.status}. Try a different URL.`),
         { status: 400 }
       );
     }
@@ -51,13 +52,13 @@ export async function POST(req: NextRequest) {
     const html    = await res.text();
     const scraped = parsePage(html, url);
 
-    return NextResponse.json({ success: true, data: scraped });
+    return NextResponse.json(apiOk(scraped));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Scrape failed";
     // Timeout
     if (msg.includes("signal") || msg.includes("abort") || msg.includes("timeout")) {
-      return NextResponse.json({ error: "Request timed out — site took too long to respond." }, { status: 408 });
+      return NextResponse.json(apiErr("Request timed out — site took too long to respond."), { status: 408 });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(apiErr(msg), { status: 500 });
   }
 }

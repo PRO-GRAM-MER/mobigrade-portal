@@ -6,6 +6,7 @@ import { Clock, CheckCircle2, XCircle, AlertCircle, Store } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import { RetailersFilter } from "./RetailersFilter";
 import classes from "./retailers.module.css";
+import s from "../admin.module.css";
 
 export const metadata: Metadata = { title: "Retailers — MobiGrade Portal" };
 
@@ -40,35 +41,54 @@ function SkeletonRows() {
   ));
 }
 
-async function RetailersTable({ search, status }: { search: string; status: string }) {
-  const retailers = await prisma.user.findMany({
-    where: {
-      role: "RETAILER",
-      ...(status ? { verificationStatus: status as VerificationStatus } : {}),
-      ...(search ? {
-        OR: [
-          { email:  { contains: search, mode: "insensitive" } },
-          { mobile: { contains: search } },
-        ],
-      } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      mobile: true,
-      verificationStatus: true,
-      createdAt: true,
-      retailerProfile: {
-        select: {
-          businessName: true,
-          _count: { select: { orders: true } },
+const PAGE_SIZE = 25;
+
+async function RetailersTable({ search, status, page }: { search: string; status: string; page: number }) {
+  const where = {
+    role: "RETAILER" as const,
+    ...(status ? { verificationStatus: status as VerificationStatus } : {}),
+    ...(search ? {
+      OR: [
+        { email:  { contains: search, mode: "insensitive" as const } },
+        { mobile: { contains: search } },
+      ],
+    } : {}),
+  };
+
+  const [retailers, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        mobile: true,
+        verificationStatus: true,
+        createdAt: true,
+        retailerProfile: {
+          select: {
+            businessName: true,
+            _count: { select: { orders: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  function buildUrl(p: number) {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (status) params.set("status", status);
+    if (p > 1)  params.set("page", String(p));
+    const str = params.toString();
+    return `/admin/retailers${str ? `?${str}` : ""}`;
+  }
 
   if (retailers.length === 0) {
     return (
@@ -82,50 +102,69 @@ async function RetailersTable({ search, status }: { search: string; status: stri
   }
 
   return (
-    <div className={classes.tableCard}>
-      <table className={classes.table}>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>Orders</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {retailers.map(r => (
-            <tr key={r.id}>
-              <td>
-                <p className={classes.tdName}>{r.fullName}</p>
-                <p className={classes.tdSub}>{r.retailerProfile?.businessName ?? "No business name"}</p>
-              </td>
-              <td>{r.email}</td>
-              <td>{r.mobile}</td>
-              <td style={{ fontWeight: 600, color: "var(--color-primary)" }}>
-                {r.retailerProfile?._count.orders ?? 0}
-              </td>
-              <td><StatusPill status={r.verificationStatus} /></td>
-              <td>
-                <Link href={`/admin/retailers/${r.id}`} className={classes.viewBtn}>
-                  View
-                </Link>
-              </td>
+    <>
+      <div className={classes.tableCard}>
+        <table className={classes.table}>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Orders</th>
+              <th>Status</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {retailers.map(r => (
+              <tr key={r.id}>
+                <td>
+                  <p className={classes.tdName}>{r.fullName}</p>
+                  <p className={classes.tdSub}>{r.retailerProfile?.businessName ?? "No business name"}</p>
+                </td>
+                <td>{r.email}</td>
+                <td>{r.mobile}</td>
+                <td style={{ fontWeight: 600, color: "var(--color-primary)" }}>
+                  {r.retailerProfile?._count.orders ?? 0}
+                </td>
+                <td><StatusPill status={r.verificationStatus} /></td>
+                <td>
+                  <Link href={`/admin/retailers/${r.id}`} className={classes.viewBtn}>
+                    View
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className={s.pagination}>
+          <span className={s.paginationInfo}>
+            Page {page} of {totalPages} · {total} total
+          </span>
+          <div className={s.paginationControls}>
+            {page > 1 && (
+              <Link href={buildUrl(page - 1)} className={s.pageBtn}>← Prev</Link>
+            )}
+            {page < totalPages && (
+              <Link href={buildUrl(page + 1)} className={s.pageBtn}>Next →</Link>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
 export default async function RetailersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
 }) {
-  const { search = "", status = "" } = await searchParams;
+  const { search = "", status = "", page: pageParam = "1" } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam, 10));
 
   return (
     <div className={classes.page}>
@@ -143,7 +182,7 @@ export default async function RetailersPage({
           </div>
         }
       >
-        <RetailersTable search={search} status={status} />
+        <RetailersTable search={search} status={status} page={page} />
       </Suspense>
     </div>
   );

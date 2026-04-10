@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import {
   assertTransition,
   OrderMachineError,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/order-machine";
 import { z } from "zod";
 import type { OrderStatus, CancelledBy } from "@prisma/client";
+
+const log = logger("order-actions");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,12 +100,26 @@ export async function placeOrderAction(
   }
 
   const { items, shippingAddressId, paymentMethod, gatewayOrderId } = parsed.data;
+  log.info("placeOrder: called", { userId: session.user.id, itemCount: items.length, paymentMethod });
 
   // ── Fetch retailer profile + address ──────────────────────────────────────
   const retailer = await prisma.retailerProfile.findUnique({
     where: { userId: session.user.id },
-    include: {
-      addresses: { where: { id: shippingAddressId } },
+    select: {
+      id: true,
+      addresses: {
+        where: { id: shippingAddressId },
+        select: {
+          id: true,
+          recipientName: true,
+          line1: true,
+          line2: true,
+          city: true,
+          state: true,
+          pincode: true,
+          phone: true,
+        },
+      },
     },
   });
 
@@ -114,7 +131,23 @@ export async function placeOrderAction(
   const liveProductIds = items.map((i) => i.liveProductId);
   const liveProducts = await prisma.liveProduct.findMany({
     where: { id: { in: liveProductIds }, status: "PUBLISHED" },
-    include: { sellerProduct: true },
+    select: {
+      id: true,
+      title: true,
+      sellerProductId: true,
+      listingPrice: true,
+      sellerProduct: {
+        select: {
+          id: true,
+          sellerProfileId: true,
+          brand: true,
+          modelName: true,
+          partName: true,
+          condition: true,
+          quantity: true,
+        },
+      },
+    },
   });
 
   if (liveProducts.length !== items.length) {
@@ -225,6 +258,7 @@ export async function placeOrderAction(
     return order;
   });
 
+  log.info("placeOrder: succeeded", { orderId: order.id, orderNumber: order.orderNumber, total });
   return { success: true, data: { orderId: order.id, orderNumber: order.orderNumber } };
 }
 
@@ -244,6 +278,7 @@ export async function confirmPaymentAction(
   });
 
   if (!order) return { success: false, error: "Order not found" };
+  log.info("confirmPayment: called", { orderId, gatewayPaymentId });
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -260,10 +295,14 @@ export async function confirmPaymentAction(
       await applyOrderTransition(tx, orderId, order.status as OrderStatus, "PAYMENT_CAPTURED", "SYSTEM", "gateway");
     });
   } catch (e) {
-    if (e instanceof OrderMachineError) return { success: false, error: e.message };
+    if (e instanceof OrderMachineError) {
+      log.warn("confirmPayment: invalid transition", { orderId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("confirmPayment: succeeded", { orderId });
   return { success: true, data: undefined };
 }
 
@@ -294,7 +333,10 @@ export async function adminConfirmOrderAction(
       await applyOrderTransition(tx, orderId, "CONFIRMED", "PROCESSING", "ADMIN", session.user.id);
     });
   } catch (e) {
-    if (e instanceof OrderMachineError) return { success: false, error: e.message };
+    if (e instanceof OrderMachineError) {
+      log.warn("adminConfirmOrder: invalid transition", { orderId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
@@ -317,6 +359,7 @@ export async function adminConfirmOrderAction(
     });
   }
 
+  log.info("adminConfirmOrder: succeeded", { orderId, adminId: session.user.id });
   return { success: true, data: undefined };
 }
 
@@ -380,10 +423,14 @@ export async function shipOrderAction(
       });
     });
   } catch (e) {
-    if (e instanceof OrderMachineError) return { success: false, error: e.message };
+    if (e instanceof OrderMachineError) {
+      log.warn("shipOrder: invalid transition", { orderId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("shipOrder: succeeded", { orderId, sellerProfileId: sellerProfile.id, trackingNumber });
   return { success: true, data: undefined };
 }
 
@@ -399,7 +446,8 @@ export async function markDeliveredAction(orderId: string): Promise<ActionResult
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: {
+    select: {
+      status: true,
       items: {
         select: {
           id: true,
@@ -450,10 +498,14 @@ export async function markDeliveredAction(orderId: string): Promise<ActionResult
       });
     });
   } catch (e) {
-    if (e instanceof OrderMachineError) return { success: false, error: e.message };
+    if (e instanceof OrderMachineError) {
+      log.warn("markDelivered: invalid transition", { orderId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("markDelivered: succeeded", { orderId, adminId: session.user.id, itemCount: order.items.length });
   return { success: true, data: undefined };
 }
 
@@ -478,7 +530,8 @@ export async function cancelOrderAction(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: {
+    select: {
+      status: true,
       items: { select: { id: true, sellerProductId: true, quantity: true } },
       payment: { select: { id: true, status: true, amount: true } },
     },
@@ -521,9 +574,13 @@ export async function cancelOrderAction(
       }
     });
   } catch (e) {
-    if (e instanceof OrderMachineError) return { success: false, error: e.message };
+    if (e instanceof OrderMachineError) {
+      log.warn("cancelOrder: invalid transition", { orderId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("cancelOrder: succeeded", { orderId, actor, cancelledBy });
   return { success: true, data: undefined };
 }

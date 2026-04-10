@@ -18,6 +18,8 @@ export interface SignedUploadParams {
   publicId: string;
   cloudName: string;
   apiKey: string;
+  allowedFormats: string;
+  maxFileSize: number;
 }
 
 export interface CloudinaryUploadResult {
@@ -39,6 +41,13 @@ export const CLOUDINARY_FOLDERS = {
 // Cloudinary regardless of whether the account uses "Fixed" or "Dynamic" folder
 // mode — both modes respect an explicit public_id in the signed params.
 
+// ─── Upload constraints ───────────────────────────────────────────────────────
+// These are signed into the upload params — Cloudinary enforces them server-side.
+// Any client upload that violates these will receive a 400 from Cloudinary.
+
+const UPLOAD_ALLOWED_FORMATS = "jpg,jpeg,png,webp,pdf";
+const UPLOAD_MAX_BYTES        = 5 * 1024 * 1024; // 5 MB
+
 export function generateSignedUploadParams(
   userId: string,
   folder?: string,
@@ -49,8 +58,14 @@ export function generateSignedUploadParams(
   const suffix = `${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
   const publicId = `${baseFolder}/${suffix}`;
 
-  // Sign only the params the client will actually POST — any mismatch = 401.
-  const paramsToSign = { public_id: publicId, timestamp };
+  // Sign all upload constraints — Cloudinary rejects any upload that doesn't
+  // match the signed params exactly, preventing format/size abuse.
+  const paramsToSign = {
+    public_id:       publicId,
+    timestamp,
+    allowed_formats: UPLOAD_ALLOWED_FORMATS,
+    max_file_size:   UPLOAD_MAX_BYTES,
+  };
 
   const signature = cloudinary.utils.api_sign_request(
     paramsToSign,
@@ -61,8 +76,10 @@ export function generateSignedUploadParams(
     signature,
     timestamp,
     publicId,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
-    apiKey:    process.env.CLOUDINARY_API_KEY!,
+    cloudName:      process.env.CLOUDINARY_CLOUD_NAME!,
+    apiKey:         process.env.CLOUDINARY_API_KEY!,
+    allowedFormats: UPLOAD_ALLOWED_FORMATS,
+    maxFileSize:    UPLOAD_MAX_BYTES,
   };
 }
 

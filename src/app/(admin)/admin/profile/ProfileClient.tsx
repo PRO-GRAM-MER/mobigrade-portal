@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Camera, ArrowLeft } from "lucide-react";
 import { updateAvatarAction, changePasswordAction } from "@/actions/profile-actions";
 import type { CloudinaryUploadResult, SignedUploadParams } from "@/lib/cloudinary";
+import { getImageUrl } from "@/lib/image";
 import classes from "./profile.module.css";
 
 /* ── Cloudinary upload ───────────────────────────────────────────────────── */
@@ -44,7 +45,7 @@ export default function AdminProfileClient({ fullName, email, avatarUrl: initAva
   const router = useRouter();
 
   /* ── Avatar ── */
-  const [avatar, setAvatar]                   = useState(initAvatar);
+  const [avatar, setAvatar]                   = useState(initAvatar ? getImageUrl(initAvatar) : initAvatar);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   /* ── Change password (inline) ── */
@@ -61,8 +62,8 @@ export default function AdminProfileClient({ fullName, email, avatarUrl: initAva
     setAvatarUploading(true);
     try {
       const result = await uploadToCloudinary(file, "/api/profile/upload-signature");
-      await updateAvatarAction(result.secure_url);
-      setAvatar(result.secure_url);
+      await updateAvatarAction(result.public_id);
+      setAvatar(getImageUrl(result.public_id));
     } catch { /* silent */ }
     finally { setAvatarUploading(false); }
   }

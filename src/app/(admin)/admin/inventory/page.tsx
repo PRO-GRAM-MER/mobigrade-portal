@@ -43,8 +43,16 @@ export default async function InventoryPage({
       orderBy: { approvedAt: "desc" },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: {
-        sellerProfile: { include: { user: { select: { fullName: true } } } },
+      select: {
+        id: true,
+        brand: true,
+        modelName: true,
+        partName: true,
+        condition: true,
+        sellerPrice: true,
+        quantity: true,
+        status: true,
+        sellerProfile: { select: { user: { select: { fullName: true } } } },
         category: { select: { name: true } },
         liveProduct: { select: { id: true, status: true, listingPrice: true } },
       },

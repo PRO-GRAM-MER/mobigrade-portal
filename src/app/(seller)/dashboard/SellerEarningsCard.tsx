@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { IndianRupee, ShoppingBag, Check, ChevronDown, Wallet } from "lucide-react";
+import type { ApiResponse } from "@/lib/api";
 import classes from "./dashboard.module.css";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -97,7 +98,7 @@ export default function SellerEarningsCard() {
     setLoading(true);
     fetch(`/api/seller/earnings?period=${period.toLowerCase()}`)
       .then(r => r.json())
-      .then((d: EarningsData) => { setData(d); setLoading(false); })
+      .then((r: ApiResponse<EarningsData>) => { if (r.success) setData(r.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [period]);
 

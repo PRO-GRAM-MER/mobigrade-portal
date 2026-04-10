@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, type Transition, type TargetAndTransition } from "framer-motion";
+import { motion, type Transition, type TargetAndTransition } from "motion/react";
 import {
   Users, Store, ShoppingCart, RotateCcw,
   UserCheck, ClipboardList, Package, ArrowRight, LayoutDashboard,

@@ -1,12 +1,13 @@
 import { auth } from "@/auth";
-import { listPendingDraftsAction, listPendingBatchesAction } from "@/actions/admin-actions";
+import { queryPendingDrafts, queryPendingBatches } from "@/lib/queries/admin";
 import { NextResponse } from "next/server";
+import { apiOk, apiErr } from "@/lib/api";
 
 // GET /api/admin/review?page=1&view=batches|drafts&batchId=xxx
 export async function GET(req: Request) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(apiErr("Unauthorized"), { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -15,10 +16,10 @@ export async function GET(req: Request) {
   const batchId = searchParams.get("batchId") ?? undefined;
 
   if (view === "batches") {
-    const data = await listPendingBatchesAction();
-    return NextResponse.json(data);
+    const data = await queryPendingBatches();
+    return NextResponse.json(apiOk(data));
   }
 
-  const data = await listPendingDraftsAction(page, batchId);
-  return NextResponse.json(data);
+  const data = await queryPendingDrafts(page, batchId);
+  return NextResponse.json(apiOk(data));
 }

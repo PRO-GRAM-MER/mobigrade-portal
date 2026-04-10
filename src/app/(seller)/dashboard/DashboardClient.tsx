@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, type Transition, type TargetAndTransition } from "framer-motion";
+import { motion, type Transition, type TargetAndTransition } from "motion/react";
 import {
   Package, Clock, ShoppingBag, IndianRupee,
   AlertTriangle, LayoutDashboard,

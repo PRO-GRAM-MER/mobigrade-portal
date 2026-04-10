@@ -43,9 +43,15 @@ export default async function KycReviewPage({
       orderBy: { createdAt: "desc" },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: {
+      select: {
+        id: true,
+        status: true,
+        gstNumber: true,
+        createdAt: true,
         sellerProfile: {
-          include: { user: { select: { fullName: true, email: true, mobile: true } } },
+          select: {
+            user: { select: { fullName: true, email: true, mobile: true } },
+          },
         },
       },
     }),

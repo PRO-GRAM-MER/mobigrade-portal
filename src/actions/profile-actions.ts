@@ -3,7 +3,10 @@
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = logger("profile-actions");
 
 type Result<T = undefined> =
   | { success: true; data?: T }
@@ -51,13 +54,17 @@ export async function changePasswordAction(data: {
   if (!user) return { success: false, error: "User not found" };
 
   const valid = await bcrypt.compare(data.currentPassword, user.passwordHash);
-  if (!valid) return { success: false, error: "Current password is incorrect" };
+  if (!valid) {
+    log.warn("changePassword: wrong current password", { userId: session.user.id });
+    return { success: false, error: "Current password is incorrect" };
+  }
 
   const hash = await bcrypt.hash(data.newPassword, 12);
   await prisma.user.update({
     where: { id: session.user.id },
     data: { passwordHash: hash },
   });
+  log.info("changePassword: succeeded", { userId: session.user.id });
   return { success: true };
 }
 

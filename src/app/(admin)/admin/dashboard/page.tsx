@@ -24,8 +24,15 @@ export default async function AdminDashboardPage() {
       where: { status: "PENDING_REVIEW" },
       orderBy: { createdAt: "desc" },
       take: 5,
-      include: {
-        sellerProfile: { include: { user: { select: { fullName: true } } } },
+      select: {
+        id: true,
+        partName: true,
+        brand: true,
+        modelName: true,
+        condition: true,
+        price: true,
+        createdAt: true,
+        sellerProfile: { select: { user: { select: { fullName: true } } } },
       },
     }),
   ]);

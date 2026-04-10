@@ -7,6 +7,7 @@ import {
   Clock, CheckCircle2, XCircle, RefreshCw, AlertCircle, ArrowRight,
 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
+import { getImageUrl } from "@/lib/image";
 import classes from "./sellerDetail.module.css";
 
 /* ── Status configs ──────────────────────────────────────────────────────── */
@@ -33,7 +34,8 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
   );
 }
 
-function DocImageCard({ title, imageUrl }: { title: string; imageUrl: string | null | undefined }) {
+function DocImageCard({ title, imageUrl: rawUrl }: { title: string; imageUrl: string | null | undefined }) {
+  const imageUrl = rawUrl ? getImageUrl(rawUrl) : undefined;
   return (
     <div className={classes.docCard}>
       <div className={classes.docCardHead}>

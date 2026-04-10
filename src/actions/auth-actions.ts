@@ -4,8 +4,11 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { signupSchema } from "@/lib/validations/auth";
 import type { SignupInput } from "@/lib/validations/auth";
+
+const log = logger("auth-actions");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -17,6 +20,7 @@ export async function signupAction(data: SignupInput): Promise<ActionResult> {
   // 1. Validate
   const parsed = signupSchema.safeParse(data);
   if (!parsed.success) {
+    log.warn("signup validation failed", { errors: parsed.error.flatten().fieldErrors });
     return {
       success: false,
       fieldErrors: parsed.error.flatten().fieldErrors as Partial<
@@ -34,6 +38,7 @@ export async function signupAction(data: SignupInput): Promise<ActionResult> {
   });
 
   if (existing) {
+    log.warn("signup conflict", { emailConflict: existing.email === email, mobileConflict: existing.mobile === mobile });
     return {
       success: false,
       fieldErrors: {
@@ -63,6 +68,7 @@ export async function signupAction(data: SignupInput): Promise<ActionResult> {
     }),
   ]);
 
+  log.info("seller signed up", { email });
   return { success: true };
 }
 
@@ -91,6 +97,7 @@ export async function forgotPasswordAction(email: string): Promise<SimpleResult>
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   const roleLabel = user.role === "ADMIN" ? "Administrator" : "Seller";
 
+  log.info("password reset requested", { userId: user.id });
   try {
     await resend.emails.send({
       from: "MobiGrade Portal <noreply@mobigrade.in>",
@@ -118,9 +125,8 @@ export async function forgotPasswordAction(email: string): Promise<SimpleResult>
         </div>
       `,
     });
-  } catch {
-    // Don't expose email send failures to client
-    console.error("[forgot-password] email send failed");
+  } catch (err) {
+    log.error("forgot-password email send failed", { userId: user.id, error: String(err) });
   }
 
   return { success: true };
@@ -139,6 +145,7 @@ export async function resetPasswordAction(token: string, newPassword: string): P
   });
 
   if (!user || !user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
+    log.warn("password reset attempt with invalid/expired token");
     return { success: false, error: "INVALID_TOKEN" };
   }
 
@@ -153,5 +160,6 @@ export async function resetPasswordAction(token: string, newPassword: string): P
     },
   });
 
+  log.info("password reset succeeded", { userId: user.id });
   return { success: true };
 }

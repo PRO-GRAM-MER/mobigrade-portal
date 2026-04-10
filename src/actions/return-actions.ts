@@ -2,11 +2,14 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import {
   assertReturnTransition,
   ReturnMachineError,
   type ReturnActor,
 } from "@/lib/return-machine";
+
+const log = logger("return-actions");
 import { z } from "zod";
 import type { ReturnStatus } from "@prisma/client";
 
@@ -156,6 +159,7 @@ export async function requestReturnAction(
     return returnRequest;
   });
 
+  log.info("requestReturn: succeeded", { returnRequestId: returnRequest.id, orderId, userId: session.user.id });
   return { success: true, data: { returnRequestId: returnRequest.id } };
 }
 
@@ -210,10 +214,14 @@ export async function reviewReturnAction(
       }
     });
   } catch (e) {
-    if (e instanceof ReturnMachineError) return { success: false, error: e.message };
+    if (e instanceof ReturnMachineError) {
+      log.warn("reviewReturn: invalid transition", { returnRequestId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("reviewReturn: succeeded", { returnRequestId, decision, adminId: session.user.id });
   return { success: true, data: undefined };
 }
 
@@ -291,9 +299,13 @@ export async function closeReturnWithRefundAction(
       }
     });
   } catch (e) {
-    if (e instanceof ReturnMachineError) return { success: false, error: e.message };
+    if (e instanceof ReturnMachineError) {
+      log.warn("closeReturnWithRefund: invalid transition", { returnRequestId, error: e.message });
+      return { success: false, error: e.message };
+    }
     throw e;
   }
 
+  log.info("closeReturnWithRefund: succeeded", { returnRequestId, refundAmount, adminId: session.user.id });
   return { success: true, data: undefined };
 }

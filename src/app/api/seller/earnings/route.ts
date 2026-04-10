@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { apiOk, apiErr } from "@/lib/api";
 
 const PALETTE = ["#2F3567", "#FF6F3F", "#00A267", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4"];
 
@@ -17,14 +18,14 @@ function getStartDate(period: string): Date {
 export async function GET(req: Request) {
   const session = await auth();
   if (!session || session.user.role !== "SELLER") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(apiErr("Unauthorized"), { status: 401 });
   }
 
   const profile = await prisma.sellerProfile.findUnique({
     where: { userId: session.user.id },
     select: { id: true },
   });
-  if (!profile) return NextResponse.json({ error: "No profile" }, { status: 404 });
+  if (!profile) return NextResponse.json(apiErr("No profile"), { status: 404 });
 
   const period    = new URL(req.url).searchParams.get("period") ?? "monthly";
   const startDate = getStartDate(period);
@@ -86,12 +87,12 @@ export async function GET(req: Request) {
     .sort((a, b) => b.total - a.total)
     .map((c, i) => ({ ...c, color: PALETTE[i % PALETTE.length] }));
 
-  return NextResponse.json({
+  return NextResponse.json(apiOk({
     totalOrderItems: orderItemCount,
     grossSales,
     netEarnings,
     onHold,
     cleared,
     categoryBreakdown,
-  });
+  }));
 }

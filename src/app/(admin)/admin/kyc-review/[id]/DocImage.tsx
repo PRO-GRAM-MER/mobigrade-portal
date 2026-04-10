@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileText, ImageOff } from "lucide-react";
+import { getImageUrl } from "@/lib/image";
 import s from "../../admin.module.css";
 
 interface Props {
@@ -9,7 +10,8 @@ interface Props {
   label: string;
 }
 
-export default function DocImage({ src, label }: Props) {
+export default function DocImage({ src: rawSrc, label }: Props) {
+  const src = getImageUrl(rawSrc);
   const [errored, setErrored] = useState(false);
 
   return (

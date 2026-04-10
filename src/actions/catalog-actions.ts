@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import {
   productRowSchema,
   validateCsvRow,
@@ -11,6 +12,8 @@ import {
 } from "@/lib/validations/catalog";
 import type { DraftStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+
+const log = logger("catalog-actions");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +81,7 @@ export async function submitCsvBatchAction(
   const guard = await getVerifiedSeller();
   if ("error" in guard) return { success: false, error: guard.error as string };
   const { sellerProfileId } = guard;
+  log.info("submitCsvBatch: called", { sellerProfileId, filename, rowCount: rawRows.length });
 
   if (!filename.trim()) return { success: false, error: "Filename is required" };
   if (rawRows.length === 0) return { success: false, error: "No rows to submit" };
@@ -169,6 +173,7 @@ export async function submitCsvBatchAction(
     return batch;
   });
 
+  log.info("submitCsvBatch: succeeded", { sellerProfileId, batchId: batch.id, valid: validResults.length, errors: errorResults.length });
   return {
     success: true,
     data: {
@@ -189,6 +194,7 @@ export async function submitManualDraftAction(
   const guard = await getVerifiedSeller();
   if ("error" in guard) return { success: false, error: guard.error as string };
   const { sellerProfileId } = guard;
+  log.info("submitManualDraft: called", { sellerProfileId });
 
   const parsed = productRowSchema.safeParse(input);
   if (!parsed.success) {
@@ -226,6 +232,7 @@ export async function submitManualDraftAction(
     select: { id: true },
   });
 
+  log.info("submitManualDraft: succeeded", { sellerProfileId, draftId: draft.id });
   return { success: true, data: { draftId: draft.id } };
 }
 
@@ -643,9 +650,11 @@ export async function submitBatchAction(
 
   if (!batch) return { success: false, error: "Batch not found" };
   if (batch.status !== "VALIDATED") {
+    log.warn("submitBatch: wrong status", { batchId, status: batch.status });
     return { success: false, error: "Only VALIDATED batches can be submitted for review" };
   }
   if (batch.errorRows > 0) {
+    log.warn("submitBatch: has error rows", { batchId, errorRows: batch.errorRows });
     return { success: false, error: "Cannot submit batch with validation errors" };
   }
 
@@ -663,5 +672,6 @@ export async function submitBatchAction(
   revalidatePath("/spare-parts");
   revalidatePath(`/spare-parts/batches/${batchId}`);
 
+  log.info("submitBatch: succeeded", { batchId, sellerProfileId });
   return { success: true, data: undefined };
 }

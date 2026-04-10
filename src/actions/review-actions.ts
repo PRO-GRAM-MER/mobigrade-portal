@@ -2,7 +2,10 @@
 
 import { auth }             from "@/auth";
 import { prisma }           from "@/lib/prisma";
+import { logger }           from "@/lib/logger";
 import { revalidatePath }   from "next/cache";
+
+const log = logger("review-actions");
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -81,8 +84,10 @@ export async function approveDraftAction(
     revalidatePath("/admin/product-review");
     revalidatePath(`/admin/product-review/${draftId}`);
     revalidatePath("/admin/our-inventory", "layout");
+    log.info("approveDraft: succeeded", { draftId });
     return { success: true, data: undefined };
   } catch (e) {
+    log.error("approveDraft: failed", { draftId, error: String(e) });
     return { success: false, error: e instanceof Error ? e.message : "Failed" };
   }
 }
@@ -103,8 +108,10 @@ export async function rejectDraftAction(
     });
     revalidatePath("/admin/product-review");
     revalidatePath(`/admin/product-review/${draftId}`);
+    log.info("rejectDraft: succeeded", { draftId });
     return { success: true, data: undefined };
   } catch (e) {
+    log.error("rejectDraft: failed", { draftId, error: String(e) });
     return { success: false, error: e instanceof Error ? e.message : "Failed" };
   }
 }
@@ -209,11 +216,13 @@ export async function publishDraftAction(
     revalidatePath(`/admin/product-review/${draftId}`);
     revalidatePath("/admin/inventory");
 
+    log.info("publishDraft: succeeded", { draftId, sellerProductId: sellerProduct.id, liveProductId: liveProduct.id });
     return {
       success: true,
       data: { sellerProductId: sellerProduct.id, liveProductId: liveProduct.id },
     };
   } catch (e) {
+    log.error("publishDraft: failed", { draftId, error: String(e) });
     return { success: false, error: e instanceof Error ? e.message : "Publish failed" };
   }
 }

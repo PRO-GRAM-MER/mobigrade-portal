@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Eye, EyeOff, ArrowRight, Leaf, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { resetPasswordAction } from "@/actions/auth-actions";

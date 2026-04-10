@@ -2,9 +2,12 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { deleteCloudinaryAsset } from "@/lib/cloudinary";
 import { kycSchema, type KycInput } from "@/lib/validations/kyc";
 import type { KycStatus, KycDocumentType, VerificationStatus } from "@prisma/client";
+
+const log = logger("kyc-actions");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,8 +22,10 @@ type ActionResult =
 export async function submitKycAction(data: KycInput): Promise<ActionResult> {
   const session = await auth();
   if (!session || session.user.role !== "SELLER") {
+    log.warn("submitKyc: unauthorized");
     return { success: false, error: "Unauthorized" };
   }
+  log.info("submitKyc: called", { userId: session.user.id });
 
   // ── 1. Guard: allow from pending, rejected, or admin-unlocked edit ──────────
   const allowedStatuses: VerificationStatus[] = ["KYC_PENDING", "KYC_REJECTED", "KYC_APPROVED"];
@@ -48,6 +53,7 @@ export async function submitKycAction(data: KycInput): Promise<ActionResult> {
   // ── 2. Validate ───────────────────────────────────────────────────────────
   const parsed = kycSchema.safeParse(data);
   if (!parsed.success) {
+    log.warn("submitKyc: validation failed", { userId: session.user.id });
     return {
       success: false,
       fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
@@ -149,6 +155,7 @@ export async function submitKycAction(data: KycInput): Promise<ActionResult> {
     ),
   ]);
 
+  log.info("submitKyc: succeeded", { userId: session.user.id, sellerProfileId });
   return { success: true };
 }
 
@@ -200,10 +207,11 @@ export async function updateKycStatusAction(
   rejectionReason?: string
 ): Promise<ActionResult> {
   const session = await auth();
-  // This action is admin-only — the admin app will call it with its own auth
   if (!session || session.user.role !== "ADMIN") {
+    log.warn("updateKycStatus: unauthorized");
     return { success: false, error: "Unauthorized" };
   }
+  log.info("updateKycStatus: called", { adminId: session.user.id, kycSubmissionId, newStatus });
 
   if (newStatus === "REJECTED" && !rejectionReason?.trim()) {
     return { success: false, error: "Rejection reason is required." };
@@ -232,6 +240,7 @@ export async function updateKycStatusAction(
   };
 
   if (!validTransitions[submission.status].includes(newStatus)) {
+    log.warn("updateKycStatus: invalid transition", { from: submission.status, to: newStatus });
     return {
       success: false,
       error: `Cannot transition from ${submission.status} to ${newStatus}.`,
@@ -254,5 +263,6 @@ export async function updateKycStatusAction(
     }),
   ]);
 
+  log.info("updateKycStatus: succeeded", { kycSubmissionId, newStatus, adminId: session.user.id });
   return { success: true };
 }

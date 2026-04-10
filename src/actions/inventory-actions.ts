@@ -2,7 +2,10 @@
 
 import { auth }           from "@/auth";
 import { prisma }         from "@/lib/prisma";
+import { logger }         from "@/lib/logger";
 import { revalidatePath } from "next/cache";
+
+const log = logger("inventory-actions");
 
 type ActionResult<T = void> =
   | { success: true; data: T }

@@ -10,6 +10,7 @@ import { submitKycAction } from "@/actions/kyc-actions";
 import { updateAvatarAction, changePasswordAction, requestKycEditAction } from "@/actions/profile-actions";
 import type { KycInput } from "@/lib/validations/kyc";
 import type { CloudinaryUploadResult, SignedUploadParams } from "@/lib/cloudinary";
+import { getImageUrl } from "@/lib/image";
 import classes from "./profile.module.css";
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
@@ -179,7 +180,7 @@ export default function ProfileClient({ userId, fullName, email, mobile, avatarU
   const router = useRouter();
 
   /* ── Avatar ── */
-  const [avatar, setAvatar]                   = useState(initAvatar);
+  const [avatar, setAvatar]                   = useState(initAvatar ? getImageUrl(initAvatar) : initAvatar);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   /* ── Change password (inline) ── */
@@ -202,8 +203,8 @@ export default function ProfileClient({ userId, fullName, email, mobile, avatarU
   const [gstNumber, setGstNumber]             = useState(kyc?.gstNumber ?? "");
   const [aadhaarNumber, setAadhaarNumber]     = useState(kyc?.aadhaarNumber ?? "");
   const [panNumber, setPanNumber]             = useState(kyc?.panNumber ?? "");
-  const [aadhaarImageUrl, setAadhaarImageUrl] = useState(kyc?.aadhaarImageUrl ?? "");
-  const [panImageUrl, setPanImageUrl]         = useState(kyc?.panImageUrl ?? "");
+  const [aadhaarImageUrl, setAadhaarImageUrl] = useState(kyc?.aadhaarImageUrl ? getImageUrl(kyc.aadhaarImageUrl) : "");
+  const [panImageUrl, setPanImageUrl]         = useState(kyc?.panImageUrl ? getImageUrl(kyc.panImageUrl) : "");
   const [aadhaarPubId, setAadhaarPubId]       = useState("");
   const [panPubId, setPanPubId]               = useState("");
   const [uploadingAadhaar, setUploadingAadhaar] = useState(false);
@@ -222,8 +223,8 @@ export default function ProfileClient({ userId, fullName, email, mobile, avatarU
     setAvatarUploading(true);
     try {
       const result = await uploadToCloudinary(file, "/api/profile/upload-signature");
-      await updateAvatarAction(result.secure_url);
-      setAvatar(result.secure_url);
+      await updateAvatarAction(result.public_id);
+      setAvatar(getImageUrl(result.public_id));
     } catch { /* silent */ }
     finally { setAvatarUploading(false); }
   }

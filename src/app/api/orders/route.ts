@@ -1,22 +1,29 @@
 import { auth } from "@/auth";
 import { placeOrderAction } from "@/actions/order-actions";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
+
+const log = logger("api/orders");
 
 // POST /api/orders — place a new order (RETAILER only)
 export async function POST(req: Request) {
   const session = await auth();
   if (!session || session.user.role !== "RETAILER") {
+    log.warn("POST /api/orders: unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
+  log.info("POST /api/orders", { userId: session.user.id });
   const result = await placeOrderAction(body);
 
   if (!result.success) {
+    log.warn("POST /api/orders: failed", { userId: session.user.id, error: result.error });
     return NextResponse.json({ error: result.error }, { status: 422 });
   }
 
+  log.info("POST /api/orders: created", { userId: session.user.id, orderId: result.data?.orderId });
   return NextResponse.json(result.data, { status: 201 });
 }
 
