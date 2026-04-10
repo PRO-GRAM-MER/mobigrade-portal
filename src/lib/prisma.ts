@@ -1,15 +1,15 @@
-import { Pool } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "@prisma/client";
 
+// PrismaNeon bundles @neondatabase/serverless internally — do NOT import Pool
+// separately, as mixing versions causes "Cannot read properties of null
+// (reading 'close')" crashes during Vercel serverless function teardown.
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 function createPrismaClient() {
-  // Use a plain pool without idle/connection timeouts — those timer callbacks
-  // fire during serverless function teardown and crash with "Cannot read
-  // properties of null (reading 'close')" when the socket is already GC'd.
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaNeon(pool);
+  const adapter = new PrismaNeon({
+    connectionString: process.env.DATABASE_URL!,
+  });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["query", "error"] : ["error"],
