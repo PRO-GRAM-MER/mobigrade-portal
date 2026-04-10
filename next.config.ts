@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 // ─── Content Security Policy ─────────────────────────────────────────────────
 // Controls which origins the browser trusts for each resource type.
@@ -64,26 +63,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  // Sentry org and project (set in environment or .env.local)
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-
-  // Only upload source maps when SENTRY_AUTH_TOKEN is set (CI/prod builds only)
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-
-  // Source maps are uploaded then deleted from the build output
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-
-  // Silent during local development; verbose in CI
-  silent: process.env.NODE_ENV !== "production",
-
-  // Disable Sentry completely if DSN is not configured (safe default for local dev)
-  disableLogger: true,
-
-  // Turbopack (Next.js 16) does not emit middleware.js.nft.json — skip instrumentation
-  // to avoid build failure when the file doesn't exist.
-  autoInstrumentMiddleware: false,
-});
+// withSentryConfig wrapper is intentionally omitted until SENTRY_AUTH_TOKEN is
+// configured in Vercel. The SDK still initialises at runtime via
+// sentry.client.config.ts / sentry.server.config.ts / sentry.edge.config.ts —
+// the webpack plugin is only needed for source-map uploads.
+export default nextConfig;
