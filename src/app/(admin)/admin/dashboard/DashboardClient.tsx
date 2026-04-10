@@ -11,10 +11,10 @@ import classes from "./dashboard.module.css";
 
 type Draft = {
   id: string;
-  partName: string;
+  partName: string | null;
   brand: string;
   modelName: string;
-  condition: string;
+  condition: string | null;
   price: number;
   createdAt: string;
   sellerName: string;

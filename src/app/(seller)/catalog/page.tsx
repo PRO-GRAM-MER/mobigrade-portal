@@ -195,7 +195,7 @@ function DraftsTable({
   );
 }
 
-function ConditionBadge({ condition }: { condition: string }) {
+function ConditionBadge({ condition }: { condition: string | null }) {
   const map: Record<string, string> = {
     NEW: "bg-blue-100 text-blue-700",
     OEM: "bg-purple-100 text-purple-700",
@@ -203,8 +203,8 @@ function ConditionBadge({ condition }: { condition: string }) {
     REFURBISHED: "bg-teal-100 text-teal-700",
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[condition] ?? ""}`}>
-      {condition}
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${condition ? (map[condition] ?? "") : ""}`}>
+      {condition ?? "—"}
     </span>
   );
 }

@@ -17,10 +17,12 @@ const STATUS_TABS: { value: KycStatus | "ALL"; label: string }[] = [
 ];
 
 const KYC_COLOR: Record<KycStatus, string> = {
-  SUBMITTED:    "blue",
-  UNDER_REVIEW: "yellow",
-  APPROVED:     "green",
-  REJECTED:     "red",
+  SUBMITTED:      "blue",
+  UNDER_REVIEW:   "yellow",
+  APPROVED:       "green",
+  REJECTED:       "red",
+  EDIT_REQUESTED: "yellow",
+  EDIT_UNLOCKED:  "neutral",
 };
 
 const PAGE_SIZE = 25;

@@ -35,8 +35,8 @@ export interface DraftListItem {
   id: string;
   brand: string;
   modelName: string;
-  partName: string;
-  condition: string;
+  partName: string | null;
+  condition: string | null;
   price: string;
   quantity: number;
   status: DraftStatus;
@@ -373,8 +373,8 @@ export interface ClientDraftListItem {
   id: string;
   brand: string;
   modelName: string;
-  partName: string;
-  condition: string;
+  partName: string | null;
+  condition: string | null;
   price: string;
   quantity: number;
   status: DraftStatus;
@@ -544,9 +544,9 @@ export interface BatchDetailDraft {
   rowNumber: number | null;
   brand: string;
   modelName: string;
-  partName: string;
+  partName: string | null;
   partNumber: string | null;
-  condition: string;
+  condition: string | null;
   price: string;
   quantity: number;
   description: string | null;

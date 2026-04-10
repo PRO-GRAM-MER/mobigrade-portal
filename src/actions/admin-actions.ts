@@ -272,11 +272,11 @@ export async function approveDraftAction(
     });
 
     // 2. Create stub LiveProduct (DRAFT) — pre-populated for faster enrichment
-    const slug = generateSlug(draft.brand, draft.modelName, draft.partName, sellerProduct.id);
+    const slug = generateSlug(draft.brand, draft.modelName, draft.partName ?? "", sellerProduct.id);
     await tx.liveProduct.create({
       data: {
         sellerProductId: sellerProduct.id,
-        title: `${draft.brand} ${draft.modelName} ${draft.partName}`,
+        title: `${draft.brand} ${draft.modelName} ${draft.partName ?? ""}`.trim(),
         slug,
         description: draft.description ?? "",
         specs: [],

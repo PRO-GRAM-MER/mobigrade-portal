@@ -17,7 +17,7 @@ async function uploadToCloudinary(file: File, signatureUrl: string): Promise<Clo
   formData.append("file", file);
   formData.append("signature", params.signature);
   formData.append("timestamp", String(params.timestamp));
-  formData.append("folder", params.folder);
+  formData.append("public_id", params.publicId);
   formData.append("api_key", params.apiKey);
 
   const res = await fetch(
