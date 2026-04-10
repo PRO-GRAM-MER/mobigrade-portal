@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/ankit__baagh/projects/MobiGrade/mobigrade-admin/src/**)",
+      "Read(//d/ankit__baagh/projects/MobiGrade/**)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

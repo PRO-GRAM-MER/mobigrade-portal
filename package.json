@@ -1,0 +1,46 @@
+{
+  "name": "mobigrade-portal",
+  "version": "0.1.0",
+  "private": true,
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
+    "@neondatabase/serverless": "^1.0.2",
+    "@prisma/adapter-neon": "^7.6.0",
+    "@prisma/client": "^7.6.0",
+    "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
+    "cheerio": "^1.2.0",
+    "cloudinary": "^2.9.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.7.0",
+    "next": "^16.2.2",
+    "next-auth": "^5.0.0-beta.30",
+    "papaparse": "^5.5.3",
+    "react": "^19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.4",
+    "resend": "^6.10.0",
+    "sonner": "^2.0.7",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prisma": "^7.6.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

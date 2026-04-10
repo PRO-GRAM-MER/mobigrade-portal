@@ -1,0 +1,306 @@
+/* ── Backdrop ── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+/* ── Drawer ── */
+.drawer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.10), 1px 0 0 var(--color-border);
+}
+
+/* ── Drawer Header ── */
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoWrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+
+.brandSub {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--color-accent);
+  line-height: 1;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.closeBtn:hover {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+}
+
+/* ── KYC warning banner ── */
+.kycBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background-color: #fef9c3;
+  border: 1px solid #fde68a;
+  color: #a16207;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.kycBanner:hover {
+  background-color: #fef3c7;
+}
+
+/* ── Scrollable nav area ── */
+.scrollable {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.scrollable::-webkit-scrollbar { width: 4px; }
+.scrollable::-webkit-scrollbar-track { background: transparent; }
+.scrollable::-webkit-scrollbar-thumb { background-color: var(--color-border); border-radius: 2px; }
+
+/* ── Nav container ── */
+.nav {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Nav Group ── */
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupLabel {
+  padding: 0 10px;
+  margin-bottom: 5px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-muted-foreground);
+}
+
+.groupItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Nav Item ── */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: background-color 0.13s, color 0.13s;
+  cursor: pointer;
+}
+.navItem:hover {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+}
+.navItemActive {
+  background-color: rgba(47, 53, 103, 0.08);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ── Sub-nav items (catalog indented) ── */
+.subNavItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 28px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: background-color 0.13s, color 0.13s;
+  position: relative;
+}
+.subNavItem::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-border);
+  transition: background-color 0.13s;
+}
+.subNavItem:hover {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+}
+.subNavItem:hover::before { background-color: var(--color-primary); }
+.subNavItemActive {
+  background-color: rgba(47, 53, 103, 0.07);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+.subNavItemActive::before { background-color: var(--color-accent); }
+
+/* ── Accordion trigger (inventory groups) ── */
+.accordionTrigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.13s, color 0.13s;
+}
+.accordionTrigger:hover {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+}
+.accordionTriggerActive {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.accordionLeft {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.accordionChevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-muted-foreground);
+  transition: transform 0.2s ease;
+}
+.accordionChevronOpen {
+  transform: rotate(180deg);
+}
+
+.accordionItems {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 4px;
+}
+
+/* ── Footer ── */
+.footer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.footerUser {
+  min-width: 0;
+}
+
+.footerName {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footerRole {
+  font-size: 0.65rem;
+  color: var(--color-muted-foreground);
+  margin-top: 1px;
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.logoutBtn:hover {
+  background-color: rgba(220, 38, 38, 0.08);
+  color: var(--color-error);
+}
