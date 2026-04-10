@@ -3,8 +3,10 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
+import { authConfig } from "@/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -48,31 +50,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id!;
-        token.role = user.role;
-        token.mobile = user.mobile;
-        token.verificationStatus = user.verificationStatus;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      // NextAuth v5 beta 30: token values typed as unknown — explicit casts required
-      session.user.id = token.id as string;
-      session.user.role = token.role as typeof session.user.role;
-      session.user.mobile = token.mobile as string;
-      session.user.verificationStatus = token.verificationStatus as typeof session.user.verificationStatus;
-      return session;
-    },
-  },
-
-  session: { strategy: "jwt" },
-
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
 });

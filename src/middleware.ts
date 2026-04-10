@@ -1,15 +1,9 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
 import { NextResponse } from "next/server";
+import type { NextAuthRequest } from "next-auth";
 
-/**
- * Role-based proxy (Next.js 16+).
- * Renamed from middleware.ts → proxy.ts per Next.js 16 convention.
- *
- * Route ownership:
- *   PUBLIC   → /login, /signup
- *   SELLER   → everything else at root level
- *   ADMIN    → /admin/* only
- */
+const { auth } = NextAuth(authConfig);
 
 const AUTH_ROUTES = ["/login", "/signup"];
 
@@ -23,7 +17,7 @@ const SELLER_PREFIXES = [
 
 const ADMIN_PREFIXES = ["/admin"];
 
-export const proxy = auth((req) => {
+export const middleware = auth((req: NextAuthRequest) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
   const role = session?.user?.role as "SELLER" | "ADMIN" | "RETAILER" | undefined;
