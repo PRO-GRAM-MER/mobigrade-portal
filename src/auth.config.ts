@@ -6,6 +6,7 @@ import type { NextAuthConfig } from "next-auth";
  * (Edge runtime). Keep this file free of any imports that use Node.js APIs.
  */
 export const authConfig: NextAuthConfig = {
+  providers: [], // populated in src/auth.ts with Credentials provider
   callbacks: {
     jwt({ token, user }) {
       if (user) {
