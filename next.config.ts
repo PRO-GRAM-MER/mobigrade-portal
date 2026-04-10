@@ -82,4 +82,8 @@ export default withSentryConfig(nextConfig, {
 
   // Disable Sentry completely if DSN is not configured (safe default for local dev)
   disableLogger: true,
+
+  // Turbopack (Next.js 16) does not emit middleware.js.nft.json — skip instrumentation
+  // to avoid build failure when the file doesn't exist.
+  autoInstrumentMiddleware: false,
 });
