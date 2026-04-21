@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Auth & Users ───────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  SELLER
+}
+
+enum VerificationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum KYCChangeRequestStatus {
+  NONE
+  REQUESTED
+  ACCEPTED
+}
+
+// ── Spare Parts ────────────────────────────────────────────────────────────
+
+enum SparePartStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+}
+
+enum SparePartUploadType {
+  MANUAL
+  CSV
+}
+
+enum PartCategory {
+  DISPLAY
+  BATTERY
+  CAMERA_REAR
+  CAMERA_FRONT
+  AUDIO
+  CHARGING
+  BODY
+  SENSOR
+  INTERNAL
+  THERMAL
+  OTHER
+}
+
+enum QualityGrade {
+  OEM
+  AFTERMARKET_HIGH
+  AFTERMARKET_LOW
+}
+
+// ── Phone Catalog ──────────────────────────────────────────────────────────
+
+enum PhoneCondition {
+  SEALED
+  OPEN_BOX
+}
+
+// Seller listing status (shared concept, separate from spare parts)
+enum ListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+enum NotificationType {
+  SPARE_PARTS_UPLOADED
+  SPARE_PART_CREATED
+  NEW_PHONES_UPLOADED
+  NEW_PHONE_CREATED
+  KYC_SUBMITTED
+}
+
+// ── Brand (shared by spare parts + phone catalog) ──────────────────────────
+
+enum BrandType {
+  PREMIUM
+  ACTIVE
+  LEGACY
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MODELS
+// ══════════════════════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String?
+  firstName     String
+  lastName      String
+  phone         String?
+  role          Role      @default(SELLER)
+  isActive      Boolean   @default(true)
+  emailVerified DateTime?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sellerProfile       SellerProfile?
+  passwordResetTokens PasswordResetToken[]
+  spareParts          SparePart[]
+  phoneListings       SellerPhoneListing[]
+  notifications       Notification[]
+}
+
+model SellerProfile {
+  id                     String                 @id @default(cuid())
+  userId                 String                 @unique
+  verificationStatus     VerificationStatus     @default(PENDING)
+  businessName           String?
+  gstNumber              String?
+  aadhaarNumber          String?
+  aadhaarImageUrl        String?
+  panNumber              String?
+  panImageUrl            String?
+  address                String?
+  city                   String?
+  state                  String?
+  pincode                String?
+  kycSubmittedAt         DateTime?
+  kycRejectionReason     String?
+  kycChangeRequestStatus KYCChangeRequestStatus @default(NONE)
+  kycChangeRequestedAt   DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Brand ──────────────────────────────────────────────────────────────────
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  logoUrl   String?
+  type      BrandType @default(ACTIVE)
+  createdAt DateTime  @default(now())
+
+  // Spare parts compatibility models
+  models  Model[]
+  // Phone catalog
+  phones  Phone[]
+}
+
+// ── Spare Parts Catalog ────────────────────────────────────────────────────
+
+// Model = phone model used for spare part compatibility (e.g. "iPhone 14 Pro")
+model Model {
+  id        String   @id @default(cuid())
+  name      String
+  brandId   String
+  createdAt DateTime @default(now())
+
+  brand      Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  spareParts SparePart[]
+
+  @@unique([name, brandId])
+}
+
+model SparePart {
+  id               String              @id @default(cuid())
+  sellerId         String
+  name             String
+  price            Decimal             @db.Decimal(10, 2)
+  discountedPrice  Decimal             @db.Decimal(10, 2)
+  quantity         Int
+  category         PartCategory
+  qualityGrade     QualityGrade
+  isGenericColor   Boolean             @default(false)
+  colors           String[]
+  specs            Json?
+  productDetails   String?
+  highlights       String[]
+  warrantyDays     Int?
+  adminNotes       String?
+  shortDescription String?
+  includesItems    String[]
+  weightGrams      Int?
+  slug             String?             @unique
+  returnDays       Int?
+  tags             String[]
+  enrichedAt       DateTime?
+  deployedAt       DateTime?
+  status           SparePartStatus     @default(PENDING_REVIEW)
+  uploadType       SparePartUploadType @default(MANUAL)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  seller User             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  models Model[]
+  images SparePartImage[]
+}
+
+model SparePartImage {
+  id          String   @id @default(cuid())
+  sparePartId String
+  url         String
+  isPrimary   Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  sparePart SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+}
+
+// ── Phone Catalog (Admin-managed) ──────────────────────────────────────────
+
+// Phone = a product line entry  e.g. "Apple iPhone 15 Pro"
+// Admin creates/enriches phones. Sellers do NOT create Phone records.
+model Phone {
+  id          String   @id @default(cuid())
+  brandId     String
+  name        String                          // "iPhone 15 Pro"
+  slug        String   @unique                // "apple-iphone-15-pro"
+  launchYear  Int?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brand         Brand               @relation(fields: [brandId], references: [id])
+  variants      PhoneVariant[]
+  specification PhoneSpecification?
+  images        PhoneImage[]
+
+  @@index([brandId])
+}
+
+// PhoneVariant = unique combination of RAM + Storage + Color for a Phone
+// Sellers link their listings to variants — never duplicate phone metadata
+model PhoneVariant {
+  id       String  @id @default(cuid())
+  phoneId  String
+  ram      Int                    // GB — e.g. 6, 8, 12
+  storage  Int                    // GB — e.g. 128, 256, 512
+  color    String                 // Title Case normalized — e.g. "Black Titanium"
+  colorHex String?                // optional hex for UI swatch
+  createdAt DateTime @default(now())
+
+  phone    Phone                @relation(fields: [phoneId], references: [id], onDelete: Cascade)
+  listings SellerPhoneListing[]
+
+  // Enforce uniqueness — application normalizes color to Title Case before write
+  @@unique([phoneId, ram, storage, color])
+  @@index([ram])
+  @@index([storage])
+  @@index([phoneId])
+}
+
+// Structured specs — 1:1 with Phone, populated by admin / GSM Arena enrichment
+model PhoneSpecification {
+  id      String @id @default(cuid())
+  phoneId String @unique
+
+  // Display
+  displaySize       Float?   // inches e.g. 6.12
+  displayType       String?  // "Super Retina XDR OLED"
+  displayResolution String?  // "2556 x 1179"
+  displayHz         Int?     // refresh rate
+
+  // Performance
+  chipset String?  // "Apple A17 Pro"
+  cpu     String?
+  gpu     String?
+
+  // Camera
+  rearCamera  String?  // "48MP Main + 12MP Ultra Wide + 12MP Telephoto"
+  frontCamera String?  // "12MP TrueDepth"
+
+  // Battery
+  batteryMah Int?    // 3274
+  charging   String? // "20W fast, 15W MagSafe"
+
+  // Software
+  os String? // "iOS 17"
+
+  // Connectivity
+  nfc       Boolean?
+  bluetooth String?  // "5.3"
+  wifi      String?  // "Wi-Fi 6E (802.11ax)"
+  usb       String?  // "USB 3 (USB-C)"
+
+  // Physical
+  weightGrams Int?
+  dimensions  String?  // "146.6 x 70.6 x 8.25 mm"
+  build       String?  // "Titanium frame, textured matte glass back"
+  ip          String?  // "IP68"
+  sim         String?  // "Nano-SIM + eSIM"
+
+  updatedAt DateTime @updatedAt
+
+  phone Phone @relation(fields: [phoneId], references: [id], onDelete: Cascade)
+}
+
+model PhoneImage {
+  id        String   @id @default(cuid())
+  phoneId   String
+  url       String
+  altText   String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  phone Phone @relation(fields: [phoneId], references: [id], onDelete: Cascade)
+}
+
+// ── Seller Phone Listings ──────────────────────────────────────────────────
+
+// Seller creates a listing against an existing PhoneVariant
+// Multiple sellers can list the same variant at different prices
+model SellerPhoneListing {
+  id             String              @id @default(cuid())
+  sellerId       String
+  variantId      String
+  price          Decimal             @db.Decimal(10, 2)
+  stock          Int
+  sku            String?
+  condition      PhoneCondition      @default(SEALED)
+  warrantyMonths Int?
+  warrantyType   String?
+  adminNotes     String?
+  status         ListingStatus       @default(PENDING_REVIEW)
+  uploadType     SparePartUploadType @default(MANUAL)
+  deployedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  seller  User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  variant PhoneVariant @relation(fields: [variantId], references: [id])
+
+  @@index([sellerId, status])
+  @@index([variantId])
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
