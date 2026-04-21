@@ -1,12 +1,17 @@
 generator client {
+<<<<<<< HEAD
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+=======
+  provider = "prisma-client-js"
+>>>>>>> 607b0b216c834b27ddb27ee7dbf87bdd6a4e98c8
 }
 
 datasource db {
   provider = "postgresql"
 }
 
+<<<<<<< HEAD
 // ── Auth & Users ───────────────────────────────────────────────────────────
 
 enum Role {
@@ -359,16 +364,767 @@ model SellerPhoneListing {
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────
+=======
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SELLER
+  ADMIN
+  RETAILER  // B2B buyers — repair shops, distributors
+}
+
+enum VerificationStatus {
+  KYC_PENDING
+  KYC_SUBMITTED
+  KYC_UNDER_REVIEW
+  KYC_APPROVED
+  KYC_REJECTED
+  SUSPENDED
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String             @id @default(cuid())
+  fullName             String
+  email                String             @unique
+  mobile               String             @unique
+  passwordHash         String
+  role                 UserRole           @default(SELLER)
+  verificationStatus   VerificationStatus @default(KYC_PENDING)
+  themeModePreference  ThemeMode          @default(LIGHT)
+  avatarUrl            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  passwordResetToken   String?          @unique
+  passwordResetExpiry  DateTime?
+
+  sellerProfile        SellerProfile?
+  retailerProfile      RetailerProfile?
+  notifications        Notification[]
+}
+
+// ─── SellerProfile ────────────────────────────────────────────────────────────
+
+model SellerProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  businessName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycSubmission   KycSubmission?
+  uploadBatches   CatalogUploadBatch[]
+  productDrafts   CatalogProductDraft[]
+  sellerProducts  SellerProduct[]
+  orderItems      OrderItem[]
+  earnings        SellerEarning[]
+  payouts         SellerPayout[]
+}
+
+// ─── KYC ──────────────────────────────────────────────────────────────────────
+
+enum KycStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EDIT_REQUESTED  // Seller requested permission to edit approved KYC
+  EDIT_UNLOCKED   // Admin approved the edit request — seller may resubmit
+}
+
+enum KycDocumentType {
+  GST
+  AADHAAR_PAN
+}
+
+model KycSubmission {
+  id              String          @id @default(cuid())
+  sellerProfileId String          @unique
+
+  documentType    KycDocumentType @default(AADHAAR_PAN)
+  gstNumber       String?
+  aadhaarNumber   String?
+  aadhaarImageUrl String?
+  aadhaarPublicId String?         // Cloudinary public_id — used for deletion on re-submit
+  panNumber       String?
+  panImageUrl     String?
+  panPublicId     String?
+
+  status          KycStatus       @default(SUBMITTED)
+  rejectionReason String?
+  reviewedAt      DateTime?
+  reviewedById    String?         // Admin User.id
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  sellerProfile   SellerProfile   @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ─── Catalog ───────────────────────────────────────────────────────────────────
+
+enum CategoryType {
+  SPARE_PARTS
+  VRP
+  NEW_PHONES
+  PREXO
+  OPEN_BOX
+}
+
+enum PartCondition {
+  NEW           // Brand new, original manufacturer
+  OEM           // Original Equipment Manufacturer (pulled from device)
+  AFTERMARKET   // Third-party compatible part
+  REFURBISHED   // Tested & restored used part
+}
+
+enum DraftStatus {
+  DRAFT           // Invalid CSV row stored for reference — not reviewable
+  PENDING_REVIEW  // Submitted, awaiting admin action
+  APPROVED        // Listed on marketplace
+  REJECTED        // Admin rejected with reason
+  NEEDS_CHANGES   // Admin requested edits before approval
+}
+
+enum BatchStatus {
+  PROCESSING      // Server is creating draft rows
+  VALIDATED       // All rows valid
+  PARTIALLY_VALID // Mix of valid + invalid rows
+  FAILED          // All rows invalid or parse error
+  SUBMITTED       // Seller confirmed and valid rows sent for review
+}
+
+// ─── Brand / Model master tables (seeded by admin) ───────────────────────────
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  models    Model[]
+}
+
+model Model {
+  id        String   @id @default(cuid())
+  brandId   String
+  name      String
+  slug      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, name])
+  @@index([brandId])
+}
+
+// Lookup table — seeded by admin, not created by sellers
+model SparePartCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  drafts          CatalogProductDraft[]
+  sellerProducts  SellerProduct[]
+}
+
+// Groups a single CSV upload — 1 CSV file = 1 batch
+model CatalogUploadBatch {
+  id              String      @id @default(cuid())
+  sellerProfileId String
+  filename        String
+  status          BatchStatus @default(PROCESSING)
+  totalRows       Int
+  validRows       Int         @default(0)
+  errorRows       Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  sellerProfile   SellerProfile         @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  drafts          CatalogProductDraft[]
+
+  @@index([sellerProfileId])
+  @@index([status])
+}
+
+// One product listing — sourced from CSV or manual form
+model CatalogProductDraft {
+  id              String       @id @default(cuid())
+  sellerProfileId String
+
+  // Which product category this draft belongs to
+  categoryType    CategoryType @default(SPARE_PARTS)
+
+  batchId         String?      // null = manual entry
+  rowNumber       Int?         // CSV row number for traceability (1-indexed, header excluded)
+
+  // Shared core fields (always populated regardless of category)
+  brand           String
+  modelName       String
+  price           Decimal      @db.Decimal(10, 2)
+  quantity        Int
+
+  // Spare-parts–specific fields (null for phone categories)
+  partName        String?
+  partNumber      String?
+  categoryId      String?      // → SparePartCategory (spare-parts sub-category)
+  condition       PartCondition?
+
+  // Phone-category–specific fields stored as JSON
+  // Keys mirror each CategoryConfig's field.key values
+  specs           Json?
+
+  description     String?
+
+  // Images (Cloudinary secure_url array)
+  imageUrls       String[]
+
+  // Stored per-row validation errors — populated for DRAFT (invalid) rows
+  rowErrors       Json?        // { field: string; message: string }[]
+
+  status          DraftStatus @default(DRAFT)
+  rejectionReason String?
+  reviewedAt      DateTime?
+  reviewedById    String?      // Admin User.id
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  sellerProfile   SellerProfile        @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  batch           CatalogUploadBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  category        SparePartCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sellerProduct   SellerProduct?
+
+  @@index([sellerProfileId, categoryType, status])
+  @@index([sellerProfileId, status])
+  @@index([batchId])
+  @@index([categoryType, status])
+}
+
+// ─── Admin Review Layer ────────────────────────────────────────────────────────
+// SellerProduct: created when admin APPROVES a draft.
+//   → "Seller DB" side — immutable approval snapshot owned by seller.
+//
+// LiveProduct: created when admin ENRICHES and PUBLISHES a SellerProduct.
+//   → "Website DB" side — SEO-ready, admin-curated, visible to buyers.
+//   → Extractable to a separate Neon project by swapping LiveProductPrismaClient
+//     to a different DATABASE_URL_LIVE without any schema change.
+
+enum SellerProductStatus {
+  ACTIVE        // Approved, pending admin enrichment
+  ENRICHING     // Admin is actively working on enrichment
+  LIVE          // LiveProduct is PUBLISHED — visible on marketplace
+  PAUSED        // Temporarily hidden (seller or admin request)
+  DISCONTINUED  // Permanently removed
+}
+
+enum LiveProductStatus {
+  DRAFT         // Being enriched by admin, not yet public
+  PUBLISHED     // Live and visible on marketplace website
+  ARCHIVED      // Removed from public listing
+}
+
+enum NotificationType {
+  DRAFT_SUBMITTED
+  DRAFT_APPROVED
+  DRAFT_REJECTED
+  DRAFT_NEEDS_CHANGES
+  KYC_SUBMITTED
+  KYC_APPROVED
+  KYC_REJECTED
+  ORDER_CONFIRMED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  RETURN_APPROVED
+  RETURN_REJECTED
+  REFUND_PROCESSED
+}
+
+// ─── SellerProduct ────────────────────────────────────────────────────────────
+
+model SellerProduct {
+  id              String              @id @default(cuid())
+  draftId         String              @unique  // source — immutable link to origin
+  sellerProfileId String
+  categoryId      String?
+
+  // Which product category this product belongs to
+  categoryType    CategoryType        @default(SPARE_PARTS)
+
+  // Snapshot of approved draft — never mutated after creation
+  brand           String
+  modelName       String
+  partName        String?             // null for phone categories
+  partNumber      String?
+  condition       PartCondition?      // null for phone categories
+  specs           Json?               // mirrors CatalogProductDraft.specs
+  sellerPrice     Decimal             @db.Decimal(10, 2)  // seller's submitted price
+  quantity        Int
+  description     String?
+  imageUrls       String[]            // seller-provided images
+
+  status          SellerProductStatus @default(ACTIVE)
+  approvedAt      DateTime            @default(now())
+  approvedById    String              // Admin User.id — audit trail
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  draft           CatalogProductDraft @relation(fields: [draftId], references: [id])
+  sellerProfile   SellerProfile       @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  category        SparePartCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  liveProduct     LiveProduct?
+  orderItems      OrderItem[]
+
+  @@index([sellerProfileId, categoryType, status])
+  @@index([sellerProfileId, status])
+  @@index([status])
+  @@index([approvedById])
+}
+
+// ─── LiveProduct ──────────────────────────────────────────────────────────────
+
+model LiveProduct {
+  id              String            @id @default(cuid())
+  sellerProductId String            @unique
+
+  // Admin-curated fields — these are what the website renders
+  title           String            // SEO product title
+  slug            String            @unique
+  description     String            // Full rich description (markdown)
+  highlights      String[]          // 3-6 bullet points shown on product page
+  specs           Json              // ProductSpec[] — { key: string; value: string }[]
+  imageUrls       String[]          // Admin-curated Cloudinary images
+
+  // Marketplace pricing — may include Mobigrade commission on top of sellerPrice
+  listingPrice    Decimal           @db.Decimal(10, 2)
+
+  status          LiveProductStatus @default(DRAFT)
+  publishedAt     DateTime?
+  enrichedById    String?           // Admin User.id
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  sellerProduct   SellerProduct     @relation(fields: [sellerProductId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+
+  @@index([status])
+  @@index([slug])
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+>>>>>>> 607b0b216c834b27ddb27ee7dbf87bdd6a4e98c8
 
 model Notification {
   id        String           @id @default(cuid())
   userId    String
   type      NotificationType
   title     String
+<<<<<<< HEAD
   body      String
   link      String?
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+=======
+  message   String
+  read      Boolean          @default(false)
+  metadata  Json?            // { draftId?, sellerProductId?, reason? }
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORDER MODULE
+// Four concern-separated models: Order, Payment, ReturnRequest, Refund
+// Each has its own status enum and state machine (src/lib/order-machine.ts)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Retailer (Buyer) ─────────────────────────────────────────────────────────
+
+model RetailerProfile {
+  id           String            @id @default(cuid())
+  userId       String            @unique
+  businessName String?
+  gstNumber    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addresses    RetailerAddress[]
+  orders       Order[]
+}
+
+model RetailerAddress {
+  id                String          @id @default(cuid())
+  retailerProfileId String
+  label             String          // "Office", "Warehouse", "Shop"
+  recipientName     String
+  line1             String
+  line2             String?
+  city              String
+  state             String
+  pincode           String
+  phone             String
+  isDefault         Boolean         @default(false)
+
+  retailerProfile   RetailerProfile @relation(fields: [retailerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([retailerProfileId])
+}
+
+// ─── Order ────────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PAYMENT_PENDING     // Buyer placed order, payment not yet confirmed
+  PAYMENT_FAILED      // Gateway reported failure
+  PAYMENT_CAPTURED    // Payment received — awaiting admin confirmation
+  CONFIRMED           // Admin verified — order is real, handed to sellers
+  PROCESSING          // At least one seller is preparing items
+  SHIPPED             // All items shipped
+  OUT_FOR_DELIVERY    // In transit / last-mile
+  DELIVERED           // Buyer received
+  CANCELLED           // Terminal — cancelled by buyer/seller/admin
+  RETURN_IN_PROGRESS  // Buyer requested return (denormalized flag)
+  COMPLETED           // Terminal — all settled, no return window
+}
+
+enum CancelledBy {
+  BUYER
+  SELLER
+  ADMIN
+  SYSTEM
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique  // Human-readable: MG-20250401-001234
+  retailerProfileId String
+
+  status          OrderStatus @default(PAYMENT_PENDING)
+
+  // Amount breakdown (denormalized — frozen at order time)
+  subtotal        Decimal     @db.Decimal(10, 2)
+  tax             Decimal     @db.Decimal(10, 2) @default(0)
+  shippingCharge  Decimal     @db.Decimal(10, 2) @default(0)
+  discount        Decimal     @db.Decimal(10, 2) @default(0)
+  total           Decimal     @db.Decimal(10, 2)
+
+  // Shipping address frozen at order time (JSON snapshot — immutable)
+  shippingAddress Json        // AddressSnapshot: { name, line1, city, state, pincode, phone }
+
+  // Cancel info
+  cancelledAt     DateTime?
+  cancelledBy     CancelledBy?
+  cancellationNote String?
+
+  // Key lifecycle timestamps
+  confirmedAt     DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  completedAt     DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  retailerProfile RetailerProfile      @relation(fields: [retailerProfileId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  statusHistory   OrderStatusHistory[]
+  returnRequests  ReturnRequest[]
+
+  @@index([retailerProfileId, status])
+  @@index([status])
+  @@index([orderNumber])
+}
+
+// ─── OrderItem ────────────────────────────────────────────────────────────────
+// One row per SKU per seller. Fulfillment and earnings tracked at item level.
+
+model OrderItem {
+  id                String        @id @default(cuid())
+  orderId           String
+  sellerProductId   String
+  liveProductId     String
+  sellerProfileId   String        // Denormalized — avoids join when listing seller's jobs
+
+  // Product snapshot — frozen at order time so price changes don't affect history
+  productTitle      String
+  brand             String
+  modelName         String
+  partName          String
+  condition         PartCondition
+  unitPrice         Decimal       @db.Decimal(10, 2)
+  quantity          Int
+  totalPrice        Decimal       @db.Decimal(10, 2)   // unitPrice × quantity
+
+  // Fulfillment (per-item — different sellers ship independently)
+  trackingNumber    String?
+  courierName       String?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerProduct     SellerProduct @relation(fields: [sellerProductId], references: [id])
+  liveProduct       LiveProduct   @relation(fields: [liveProductId], references: [id])
+  sellerProfile     SellerProfile @relation(fields: [sellerProfileId], references: [id])
+  earning           SellerEarning?
+  returnItems       ReturnItem[]
+
+  @@index([orderId])
+  @@index([sellerProfileId])
+  @@index([sellerProductId])
+}
+
+model OrderStatusHistory {
+  id         String       @id @default(cuid())
+  orderId    String
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  // Format: "BUYER:uid" | "SELLER:profileId" | "ADMIN:uid" | "SYSTEM"
+  actor      String
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ─── Payment ──────────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  PARTIALLY_REFUNDED
+  FULLY_REFUNDED
+  FAILED
+}
+
+enum PaymentMethod {
+  UPI
+  BANK_TRANSFER
+  CARD
+  WALLET
+  COD
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String        @unique
+
+  status           PaymentStatus @default(PENDING)
+  method           PaymentMethod
+  amount           Decimal       @db.Decimal(10, 2)
+
+  // Payment gateway fields (e.g. Razorpay)
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  gatewaySignature String?
+
+  capturedAt       DateTime?
+  failedAt         DateTime?
+  failureReason    String?
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds          Refund[]
+
+  @@index([gatewayOrderId])
+  @@index([status])
+}
+
+// ─── Return Module ────────────────────────────────────────────────────────────
+
+enum ReturnStatus {
+  REQUESTED          // Buyer submitted request
+  APPROVED           // Admin approved — pickup to be scheduled
+  REJECTED           // Admin rejected
+  PICKUP_SCHEDULED   // Logistics booked
+  PICKED_UP          // Courier collected items
+  RECEIVED           // Seller/warehouse received items
+  CLOSED             // Terminal — refund issued or rejected after receipt
+}
+
+enum ReturnReason {
+  WRONG_ITEM
+  DAMAGED_IN_TRANSIT
+  NOT_AS_DESCRIBED
+  DEFECTIVE
+  CHANGED_MIND
+  OTHER
+}
+
+model ReturnRequest {
+  id             String       @id @default(cuid())
+  orderId        String
+  retailerProfileId String
+
+  reason         ReturnReason
+  description    String?
+
+  status         ReturnStatus @default(REQUESTED)
+  reviewedAt     DateTime?
+  reviewedById   String?      // Admin User.id
+  rejectionNote  String?
+
+  pickupScheduledAt DateTime?
+  pickedUpAt       DateTime?
+  receivedAt       DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  order          Order           @relation(fields: [orderId], references: [id])
+  items          ReturnItem[]
+  refund         Refund?
+  statusHistory  ReturnStatusHistory[]
+
+  @@index([orderId])
+  @@index([retailerProfileId, status])
+  @@index([status])
+}
+
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  orderItemId     String
+  quantity        Int
+
+  // Admin fills in after receiving
+  receivedCondition String?     // e.g. "As described", "Damaged", "Tampered"
+
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+}
+
+model ReturnStatusHistory {
+  id              String       @id @default(cuid())
+  returnRequestId String
+  fromStatus      ReturnStatus?
+  toStatus        ReturnStatus
+  actor           String       // "BUYER:uid" | "ADMIN:uid" | "SYSTEM"
+  note            String?
+  createdAt       DateTime     @default(now())
+
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  @@index([returnRequestId])
+}
+
+// ─── Refund ───────────────────────────────────────────────────────────────────
+
+enum RefundStatus {
+  INITIATED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Refund {
+  id              String       @id @default(cuid())
+  paymentId       String
+  returnRequestId String?      @unique  // null = direct refund on pre-ship cancel
+
+  amount          Decimal      @db.Decimal(10, 2)
+  status          RefundStatus @default(INITIATED)
+
+  // Gateway
+  gatewayRefundId String?
+
+  initiatedAt     DateTime     @default(now())
+  processedAt     DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+
+  payment         Payment       @relation(fields: [paymentId], references: [id])
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
+
+  @@index([paymentId])
+}
+
+// ─── Seller Earnings & Payouts ────────────────────────────────────────────────
+
+enum EarningStatus {
+  PENDING    // Order placed, payment not yet confirmed
+  ON_HOLD    // Payment confirmed — T+7 hold period starts
+  CLEARED    // Hold period passed — available for payout
+  PAID       // Included in a completed SellerPayout batch
+  REVERSED   // Order cancelled / return approved — earning voided
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model SellerEarning {
+  id              String        @id @default(cuid())
+  orderItemId     String        @unique
+  sellerProfileId String
+
+  grossAmount     Decimal       @db.Decimal(10, 2)  // = orderItem.totalPrice
+  commission      Decimal       @db.Decimal(10, 2)  // Mobigrade's cut
+  netAmount       Decimal       @db.Decimal(10, 2)  // grossAmount - commission
+
+  status          EarningStatus @default(PENDING)
+  holdUntil       DateTime?     // Set to deliveredAt + 7 days on DELIVERED
+  clearedAt       DateTime?
+  payoutId        String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id])
+  payout          SellerPayout? @relation(fields: [payoutId], references: [id])
+
+  @@index([sellerProfileId, status])
+  @@index([holdUntil])
+}
+
+model SellerPayout {
+  id              String       @id @default(cuid())
+  sellerProfileId String
+  amount          Decimal      @db.Decimal(10, 2)
+  status          PayoutStatus @default(PENDING)
+  utrNumber       String?      // Unique Transaction Reference (bank transfer)
+  processedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  sellerProfile   SellerProfile  @relation(fields: [sellerProfileId], references: [id])
+  earnings        SellerEarning[]
+
+  @@index([sellerProfileId, status])
+>>>>>>> 607b0b216c834b27ddb27ee7dbf87bdd6a4e98c8
 }

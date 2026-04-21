@@ -1,0 +1,58 @@
+# Neon branch-per-PR strategy
+#
+# On PR open/reopen → create a Neon DB branch named after the PR.
+# On PR close/merge → delete the Neon DB branch.
+#
+# Required GitHub secrets:
+#   NEON_API_KEY     — from Neon dashboard → Account Settings → API Keys
+#   NEON_PROJECT_ID  — from Neon dashboard → project settings
+#
+# The branch DATABASE_URL is written to a GitHub Actions output and can be
+# forwarded to Vercel preview deployments via the Vercel GitHub integration
+# environment variable override (set DATABASE_URL per branch in Vercel settings).
+
+name: Neon Branch Management
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+jobs:
+  # ── Create branch when PR is opened or reopened ──────────────────────────────
+  create-branch:
+    if: github.event.action == 'opened' || github.event.action == 'reopened'
+    runs-on: ubuntu-latest
+    outputs:
+      db_url: ${{ steps.create.outputs.db_url }}
+    steps:
+      - name: Create Neon branch
+        id: create
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key:    ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+          username:   neondb_owner
+
+      - name: Post branch URL as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🗄️ **Neon preview branch created**\n\nBranch: \`pr-${{ github.event.pull_request.number }}\`\n\nSet this as \`DATABASE_URL\` in your Vercel preview deployment to test migrations against an isolated DB copy.`,
+            })
+
+  # ── Delete branch when PR is closed or merged ────────────────────────────────
+  delete-branch:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id:  ${{ secrets.NEON_PROJECT_ID }}
+          api_key:     ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.pull_request.number }}

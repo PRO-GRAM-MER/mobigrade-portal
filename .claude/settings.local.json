@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/ankit__baagh/projects/MobiGrade/mobigrade-admin/src/**)",
+      "Read(//d/ankit__baagh/projects/MobiGrade/**)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(cat .env)",
+      "Bash(cat .gitignore)",
+      "Bash(node:*)",
+      "Bash(npx vercel:*)",
+      "Bash(grep -v \"//.*prisma\")"
+    ]
+  }
+}
